@@ -23,7 +23,7 @@ Building Vault OCSP
 -------------------
 
 ```bash
-git clone https://github.com/T-Systems-MMS/vault-ocsp.git
+git clone https://github.com/ElmecOSS/vault-ocsp.git
 cd vault-ocsp
 go get
 go build -o vault-ocsp
@@ -37,8 +37,6 @@ Vault OCSP is helpful:
 ```bash
 ./vault-ocsp -help
 Usage of ./vault-ocsp:
-  -pkimount string
-        vault PKI mount to use (default "pki")
   -responderCert string
         OCSP responder signing certificate file
   -responderKey string
@@ -46,6 +44,9 @@ Usage of ./vault-ocsp:
   -serverAddr string
         Server IP and Port to use (default ":8080")
 ```
+
+The endpoint used for OCSP validation is:
+`http://{{serverAddr}}/{{pkimount}}/`
 
 Vault OCSP supports the same environment variables as the Vault command
 line interface. You will probably need to set `VAULT_ADDR`,

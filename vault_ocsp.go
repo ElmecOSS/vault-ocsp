@@ -15,21 +15,20 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/cloudflare/cfssl/log"
+	cfocsp "github.com/cloudflare/cfssl/ocsp"
+	"github.com/gorilla/mux"
+	"github.com/hashicorp/vault/api"
+	"golang.org/x/crypto/ocsp"
 	"io/ioutil"
 	"math/big"
 	"net/http"
 	"os"
 	"strings"
 	"time"
-
-	"github.com/cloudflare/cfssl/log"
-	cfocsp "github.com/cloudflare/cfssl/ocsp"
-	"github.com/hashicorp/vault/api"
-	"golang.org/x/crypto/ocsp"
 )
 
 func main() {
-	var pkiMount = flag.String("pkimount", "pki", "vault PKI mount to use")
 	var serverAddr = flag.String("serverAddr", ":8080", "Server IP and Port to use")
 	var responderCertFile = flag.String("responderCert", "", "OCSP responder signing certificate file")
 	var responderKeyFile = flag.String("responderKey", "", "OCSP responder signing private key file")
@@ -53,20 +52,35 @@ func main() {
 		os.Exit(1)
 	}
 
-	vaultSource, err := NewVaultSource(*pkiMount, responderCert, &responderKey, nil)
-	if err != nil {
-		log.Criticalf("vault source initialization failed: %v", err)
-		os.Exit(1)
-	}
+	rtr := mux.NewRouter()
+	rtr.HandleFunc("/{name:[^/]*}/", func(writer http.ResponseWriter, request *http.Request) {
+		params := mux.Vars(request)
+		name := params["name"]
+		h, err := handleOCSPResponder(responderCert, &responderKey, name)
+		if err != nil {
+			writer.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		h.ServeHTTP(writer, request)
 
-	http.Handle("/", cfocsp.NewResponder(vaultSource, nil))
-
+	})
+	http.Handle("/", rtr)
 	server := &http.Server{
 		Addr: *serverAddr,
 	}
 	if err := server.ListenAndServe(); err != nil {
 		log.Criticalf("ListenAndServe failed: %v", err)
 	}
+}
+
+func handleOCSPResponder(responderCertificate *x509.Certificate, responderKey *crypto.Signer, mount string) (*cfocsp.Responder, error) {
+	vaultSource, err := NewVaultSource(mount, responderCertificate, responderKey, nil)
+	if err != nil {
+		log.Criticalf("vault source initialization failed: %v", err)
+		return nil, errors.New("unable to find CA")
+	}
+
+	return cfocsp.NewResponder(vaultSource, nil), nil
 }
 func parseResponderKey(responderKeyFile string) (responderKey crypto.Signer, err error) {
 	pemBytes, err := ioutil.ReadFile(responderKeyFile)
