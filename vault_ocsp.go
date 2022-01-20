@@ -53,7 +53,7 @@ func main() {
 	}
 
 	rtr := mux.NewRouter()
-	rtr.HandleFunc("/{name:[^/]*}/", func(writer http.ResponseWriter, request *http.Request) {
+	rtr.HandleFunc("/{name:[^/]*}/{cert:.*}", func(writer http.ResponseWriter, request *http.Request) {
 		params := mux.Vars(request)
 		name := params["name"]
 		h, err := handleOCSPResponder(responderCert, &responderKey, name)
@@ -61,6 +61,8 @@ func main() {
 			writer.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		cert := params["cert"]
+		request.URL.Path = "/" + cert
 		h.ServeHTTP(writer, request)
 
 	})
@@ -248,10 +250,8 @@ func (source VaultSource) Response(request *ocsp.Request) ([]byte, http.Header, 
 		}
 		present = true
 	}
-	header := http.Header{}
-	header.Set("Content-Type", "application/ocsp-response")
 
-	return response, header, nil
+	return response, nil, nil
 }
 
 func (source VaultSource) buildRevokedResponse(serialNumber *big.Int, revocationTime time.Time) ([]byte, error) {
