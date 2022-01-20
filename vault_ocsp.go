@@ -248,8 +248,10 @@ func (source VaultSource) Response(request *ocsp.Request) ([]byte, http.Header, 
 		}
 		present = true
 	}
+	header := http.Header{}
+	header.Set("Content-Type", "application/ocsp-response")
 
-	return response, nil, nil
+	return response, header, nil
 }
 
 func (source VaultSource) buildRevokedResponse(serialNumber *big.Int, revocationTime time.Time) ([]byte, error) {
